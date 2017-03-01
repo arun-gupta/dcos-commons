@@ -16,14 +16,22 @@ def install(package_name, running_task_count, service_name=None, additional_opti
         service_name = package_name
     start = time.time()
     merged_options = get_package_options(additional_options)
-    print('Installing {} with options={} version={}'.format(package_name, merged_options, package_version))
+
+    print('Installing {} with options={} version={}'.format(
+        package_name, merged_options, package_version))
+
     # install_package_and_wait silently waits for all marathon deployments to clear.
     # to give some visibility, install in the following order:
     # 1. install package
-    shakedown.install_package(package_name, package_version=package_version, options_json=merged_options)
+    shakedown.install_package(
+        package_name,
+        package_version=package_version,
+        options_json=merged_options)
+
     # 2. wait for expected tasks to come up
     print("Waiting for expected tasks to come up...")
     sdk_tasks.check_running(service_name, running_task_count)
+
     # 3. check service health
     marathon_client = dcos.marathon.create_client()
 
@@ -34,11 +42,11 @@ def install(package_name, running_task_count, service_name=None, additional_opti
         print("Getting deployments")
         deployments = marathon_client.get_deployments()
         print("Found {} deployments".format(len(deployments)))
-        for d in deployments:
-            print("Deployment: {}".format(d))
-            for a in d.get('affectedApps', []):
-                print("Adding {}".format(a))
-                deploying_apps.add(a)
+        for deployment in deployments:
+            print("Deployment: {}".format(deployment))
+            for app in deployment.get('affectedApps', []):
+                print("Adding {}".format(app))
+                deploying_apps.add(app)
         print('Checking deployment of {} has ended:\n- Deploying apps: {}'.format(service_name, deploying_apps))
         return not '/{}'.format(service_name) in deploying_apps
     sdk_spin.time_wait_noisy(lambda: fn(), timeout_seconds=30)

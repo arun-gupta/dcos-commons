@@ -38,7 +38,7 @@ public enum Status {
     PENDING,
 
     /**
-     * The step has been evaluated, and any Tasks relevant to it have been killed if necessary.
+     * The Element has been evaluated, and any Tasks relevant to it have been killed if necessary.
      */
     PREPARED,
 
@@ -60,5 +60,12 @@ public enum Status {
      *
      * This value is only returned and never set to a variable.
      */
-    IN_PROGRESS
+    IN_PROGRESS;
+
+    public boolean isRunning() {
+        return this == PENDING ||
+                this == PREPARED ||
+                this == STARTING ||
+                this == IN_PROGRESS;
+    }
 }

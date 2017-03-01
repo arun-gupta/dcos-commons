@@ -111,7 +111,7 @@ class CITester(object):
             raise
 
 
-    def run_shakedown(self, test_dirs, requirements_txt='', pytest_types='sanity'):
+    def run_shakedown(self, test_dirs, requirements_txt=None, pytest_types='sanity'):
         # keep virtualenv in a consistent/reusable location:
         if 'WORKSPACE' in os.environ:
             virtualenv_path = os.path.join(os.environ['WORKSPACE'], 'shakedown_env')
@@ -120,7 +120,7 @@ class CITester(object):
         else:
             virtualenv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'shakedown_env')
             jenkins_args = ''
-        if requirements_txt:
+        if requirements_txt is not None:
             logger.info('Using provided requirements.txt: {}'.format(requirements_txt))
         else:
             # generate default requirements:

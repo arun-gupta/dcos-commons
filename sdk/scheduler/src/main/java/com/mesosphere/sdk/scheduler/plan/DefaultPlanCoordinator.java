@@ -98,7 +98,7 @@ public class DefaultPlanCoordinator extends ChainedObserver implements PlanCoord
 
     @Override
     public boolean hasOperations() {
-        return planManagers.stream().anyMatch(manager -> !manager.getPlan().isComplete());
+        return planManagers.stream().anyMatch(manager -> manager.getPlan().isRunning());
     }
 
     @Override

@@ -70,7 +70,7 @@ public interface Element extends Observable {
     }
 
     /**
-     * Indicates whether this Element is in progress.
+     * Indicates whether this Element is prepared.
      */
     default boolean isPrepared() {
         return getStatus().equals(Status.PREPARED);
@@ -96,6 +96,11 @@ public interface Element extends Observable {
     default boolean isComplete() {
         return getStatus().equals(Status.COMPLETE);
     }
+
+    /**
+     * Indicates whether this Element is running
+     */
+    default boolean isRunning() { return getStatus().isRunning(); }
 
     /**
      * Provides the Element with a set of named string parameters that it can either use on start or provide to
