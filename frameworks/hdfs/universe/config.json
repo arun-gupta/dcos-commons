@@ -85,7 +85,7 @@
         "mem":{
           "description":"Journal node memory requirement",
           "type":"number",
-          "default": 512
+          "default": 2048
         },
         "disk":{
           "description":"Journal node disk size requirement in MB",
@@ -96,19 +96,13 @@
           "description":"Journal node disk type",
           "type":"string",
           "default": "ROOT"
-        },
-        "strategy":{
-          "description":"Journal node deployment strategy",
-          "type":"string",
-          "default": "parallel"
         }
       },
       "required":[
         "cpus",
         "mem",
         "disk",
-        "disk_type",
-        "strategy"
+        "disk_type"
       ]
     },
     "name_node":{
@@ -123,7 +117,7 @@
         "mem":{
           "description":"Name node memory requirement",
           "type":"number",
-          "default": 512
+          "default": 2048
         },
         "disk":{
           "description":"Name node disk size requirement in MB",
@@ -155,7 +149,7 @@
         "mem":{
           "description":"ZKFC node memory requirement",
           "type":"number",
-          "default": 512
+          "default": 2048
         }
       },
       "required":[
@@ -180,7 +174,7 @@
         "mem":{
           "description":"Data node memory requirement",
           "type":"number",
-          "default": 512
+          "default": 2048
         },
         "disk":{
           "description":"Data node disk size requirement in MB",
@@ -191,19 +185,13 @@
           "description":"Data node disk type",
           "type":"string",
           "default": "ROOT"
-        },
-        "strategy":{
-          "description":"Data node deployment strategy",
-          "type":"string",
-          "default": "parallel"
         }
       },
       "required":[
         "cpus",
         "mem",
         "disk",
-        "disk_type",
-        "strategy"
+        "disk_type"
       ]
     },
     "hdfs": {
