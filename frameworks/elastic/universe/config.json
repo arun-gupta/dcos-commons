@@ -25,7 +25,7 @@
           "type": "string",
           "default": ""
         },
-        "plan_strategy": {
+        "deploy_strategy": {
           "description": "Elasticsearch and Kibana rollout strategy. [parallel, serial]",
           "type": "string",
           "default": "parallel"
