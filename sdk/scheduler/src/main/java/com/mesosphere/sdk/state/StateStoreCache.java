@@ -20,7 +20,7 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
- * Thread-safe write-through for an underlying {@link StateStore}.
+ * Thread-safe write-through cache for an underlying {@link StateStore}.
  * <p>
  * In order to maintain consistency, there should only be one StateStoreCache object per
  * process. In practice this works because there should only be one scheduler task/process

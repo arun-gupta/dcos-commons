@@ -62,6 +62,9 @@ public enum Status {
      */
     IN_PROGRESS;
 
+    /**
+     * Status is in one of the running states.
+     */
     public boolean isRunning() {
         return this == PENDING ||
                 this == PREPARED ||
