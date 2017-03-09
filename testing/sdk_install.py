@@ -11,19 +11,40 @@ import os
 import time
 
 
-def install(package_name, running_task_count, service_name=None, additional_options={}, package_version=None):
+def install_wait(package_name,
+            running_task_count,
+            service_name=None,
+            additional_options={},
+            package_version=None):
+    install(package_name, running_task_count, service_name, additional_options, package_name)
+
+
+def install(package_name,
+            running_task_count=0,
+            service_name=None,
+            additional_options={},
+            package_version=None):
+
     if not service_name:
         service_name = package_name
     start = time.time()
     merged_options = get_package_options(additional_options)
     print('Installing {} with options={} version={}'.format(package_name, merged_options, package_version))
-    # install_package_and_wait silently waits for all marathon deployments to clear.
-    # to give some visibility, install in the following order:
-    # 1. install package
-    shakedown.install_package(package_name, package_version=package_version, options_json=merged_options)
+
+    # 1. install package and,
+    #  waits for completion,  if expected running task_count is >0
+    shakedown.install_package(package_name,
+                              package_version=package_version,
+                              options_json=merged_options,
+                              wait_for_completion=(running_task_count > 0))
+    # return immediately if no need to wait
+    if running_task_count < 0:
+        return
+
     # 2. wait for expected tasks to come up
     print("Waiting for expected tasks to come up...")
     sdk_tasks.check_running(service_name, running_task_count)
+
     # 3. check service health
     marathon_client = dcos.marathon.create_client()
 
@@ -42,6 +63,8 @@ def install(package_name, running_task_count, service_name=None, additional_opti
         print('Checking deployment of {} has ended:\n- Deploying apps: {}'.format(service_name, deploying_apps))
         return not '/{}'.format(service_name) in deploying_apps
     sdk_spin.time_wait_noisy(lambda: fn(), timeout_seconds=30)
+
+    # 4. installation complete
     print('Install done after {}'.format(sdk_spin.pretty_time(time.time() - start)))
 
 

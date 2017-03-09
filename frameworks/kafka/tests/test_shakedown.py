@@ -3,57 +3,44 @@ import pytest
 import sdk_install as install
 import sdk_tasks as tasks
 import sdk_marathon as marathon
-import sdk_utils as utils
 import sdk_package as package
 import sdk_cmd as command
-import sdk_spin as spin
+import sdk_plan as plan
 import json
 import dcos
 
-from tests.config import (
+from tests.utils import (
+    DEFAULT_PARTITION_COUNT,
+    DEFAULT_REPLICATION_FACTOR,
     PACKAGE_NAME,
     DEFAULT_BROKER_COUNT,
-    DEFAULT_PARTITION_COUNT,
-    DEFAULT_REPLICATION_FACTOR
+    DEFAULT_TOPIC_NAME,
+    EPHEMERAL_TOPIC_NAME,
+    service_cli
 )
-
-from tests.test_utils import (
-    service_cli,
-    check_health,
-    get_running_broker_task
-)
-
-
-DEFAULT_TOPIC_NAME = 'topic1'
-EPHEMERAL_TOPIC_NAME = 'topic_2'
 
 
 def setup_module(module):
     install.uninstall(PACKAGE_NAME)
-    utils.gc_frameworks()
     install.install(PACKAGE_NAME, DEFAULT_BROKER_COUNT)
-    check_health()
-    default_topic()
 
 
 def teardown_module(module):
     install.uninstall(PACKAGE_NAME)
 
 
-# Connection
+# --------- Endpoints -------------
+
+
 @pytest.mark.smoke
 @pytest.mark.sanity
 def test_endpoints_address():
     def fun():
-        return service_cli('endpoints broker')
-
-    def ends(result):
-        return (
-            len(result['native']) == DEFAULT_BROKER_COUNT,
-            'waiting for the expected number of brokers to come online'
-        )
-
-    address = spin.spin(fun, ends)
+        ret=service_cli('endpoints broker')
+        if len(result['native']) == DEFAULT_BROKER_COUNT:
+            return ret
+        return False
+    address = shakedown.wait_for(fun)
     assert len(address) == 3
     assert len(address['direct']) == DEFAULT_BROKER_COUNT
 
@@ -67,7 +54,9 @@ def test_endpoints_zookeeper():
     )
 
 
-# Broker
+# --------- Broker -------------
+
+
 @pytest.mark.smoke
 @pytest.mark.sanity
 def test_broker_list():
@@ -81,38 +70,37 @@ def test_broker_invalid():
     assert not command.run_cli('{} broker get {}'.format(PACKAGE_NAME, DEFAULT_BROKER_COUNT + 1))
 
 
-# Pod
+# --------- Pods -------------
+
+
 @pytest.mark.smoke
 @pytest.mark.special
-def test_pod_restart():
+def test_pods_restart():
     for i in range(DEFAULT_BROKER_COUNT):
-        broker_task = get_running_broker_task('{}-{}-broker'.format(PACKAGE_NAME, i))[0]
-        broker_id = broker_task['id']
-        assert broker_id.startswith('{}-{}-broker-__'.format(PACKAGE_NAME,i))
-        restart_info = service_cli('pods restart {}-{}'.format(PACKAGE_NAME,i))
-        task_id_changes('{}-{}-broker'.format(PACKAGE_NAME, i), broker_id)
+        broker_id = shakedown.get_task_ids(PACKAGE_NAME,'{}-{}-broker'.format(PACKAGE_NAME, i))
+        restart_info = service_cli('pods restart {}-{}'.format(PACKAGE_NAME, i))
+        shakedown.check_task_updated(PACKAGE_NAME, '{}-{}-broker'.format(PACKAGE_NAME, i), broker_id)
         assert len(restart_info) == 2
         assert restart_info['tasks'] == '{}-{}-broker'.format(PACKAGE_NAME, i)
 
 
 @pytest.mark.smoke
 @pytest.mark.sanity
-def test_pod_replace():
-    broker_0_task = get_running_broker_task('{}-0-broker'.format(PACKAGE_NAME))[0]
-    broker_0_id = broker_0_task['id']
-
-    service_cli('pods replace {}-0-broker',format(PACKAGE_NAME))
-    task_id_changes('{}-0-broker'.format(PACKAGE_NAME), broker_0_id)
+def test_pods_replace():
+    broker_0_id = shakedown.get_task_ids(PACKAGE_NAME, '{}-0-broker'.format(PACKAGE_NAME))
+    service_cli('pods replace {}-0-broker'.format(PACKAGE_NAME))
+    shakedown.check_task_updated(PACKAGE_NAME, '{}-0-broker'.format(PACKAGE_NAME), broker_0_id)
 
 
-# Topic
+# --------- Topics -------------
+
+
 @pytest.mark.smoke
 @pytest.mark.sanity
 def test_topic_create():
     create_info = service_cli(
         'topic create {}'.format(EPHEMERAL_TOPIC_NAME)
     )
-    print(create_info)
     assert ('Created topic "%s".\n' % EPHEMERAL_TOPIC_NAME in create_info['message'])
     assert ("topics with a period ('.') or underscore ('_') could collide." in create_info['message'])
     topic_list_info = service_cli('topic list')
@@ -136,8 +124,13 @@ def test_topic_delete():
     assert len(topic_info['partitions']) == DEFAULT_PARTITION_COUNT
 
 
+@pytest.fixture
+def default_topic():
+    service_cli('topic create {}'.format(DEFAULT_TOPIC_NAME))
+
+
 @pytest.mark.sanity
-def test_topic_partition_count():
+def test_topic_partition_count(default_topic):
     topic_info = service_cli('topic describe {}'.format(DEFAULT_TOPIC_NAME))
     assert len(topic_info['partitions']) == DEFAULT_PARTITION_COUNT
 
@@ -213,12 +206,16 @@ def test_no_unavailable_partitions_exist():
     assert partition_info['message'] == ''
 
 
-# Cli
+# --------- Cli -------------
+
+
+@pytest.mark.smoke
 @pytest.mark.sanity
 def test_help():
     service_cli('help')
 
 
+@pytest.mark.smoke
 @pytest.mark.sanity
 def test_config():
     configs = service_cli('config list')
@@ -229,6 +226,7 @@ def test_config():
     assert service_cli('config target_id')
 
 
+@pytest.mark.smoke
 @pytest.mark.sanity
 def test_plan():
     assert service_cli('plan list')
@@ -237,6 +235,7 @@ def test_plan():
     assert service_cli('continue deploy Deployment')
 
 
+@pytest.mark.smoke
 @pytest.mark.sanity
 def test_state():
     assert service_cli('state framework_id')
@@ -244,7 +243,164 @@ def test_state():
     assert tasks
 
 
-# Auxiliary
+# --------- Suppressed -------------
+
+
+@pytest.mark.smoke
+@pytest.mark.smoke
+def test_suppress():
+    dcos_url = dcos.config.get_config_val('core.dcos_url')
+    suppressed_url = urllib.parse.urljoin(dcos_url,
+                                          'service/{}/v1/state/properties/suppressed'.format(PACKAGE_NAME))
+
+    def fun():
+        response = dcos.http.get(suppressed_url)
+        response.raise_for_status()
+        return response.text == "true"
+
+    shakedown.wait_for(fun)
+
+
+
+# --------- Port -------------
+
+
+import shakedown
+
+from tests.test_utils import (
+    DYNAMIC_PORT_OPTIONS_DICT,
+    STATIC_PORT_OPTIONS_DICT,
+    check_health,
+    get_kafka_config,
+    install,
+    marathon_api_url,
+    spin,
+    uninstall,
+    update_kafka_config
+)
+
+
+def get_connection_info():
+    def fn():
+        return shakedown.run_dcos_command('kafka connection')
+
+    def success_predicate(result):
+        deployments = dcos.http.get(marathon_api_url('deployments')).json()
+        if deployments:
+            return False, 'Deployment is ongoing'
+
+        stdout, stderr, rc = result
+        try:
+            result = json.loads(stdout)
+        except Exception:
+            return False, 'Command did not return JSON'
+        else:
+            return (
+                not rc and len(result['address']) == 3,
+                'Command errored or expected number of brokers are not up',
+            )
+
+    return json.loads(spin(fn, success_predicate)[0])
+
+
+def setup_module(module):
+    uninstall()
+
+
+def teardown_module(module):
+    uninstall()
+
+
+@pytest.yield_fixture
+def dynamic_port_config():
+    install(DYNAMIC_PORT_OPTIONS_DICT)
+    yield
+    uninstall()
+
+
 @pytest.fixture
-def default_topic():
-    service_cli('topic create {}'.format(DEFAULT_TOPIC_NAME))
+def static_port_config():
+    install(STATIC_PORT_OPTIONS_DICT)
+
+
+@pytest.mark.sanity
+def test_dynamic_port_comes_online(dynamic_port_config):
+    check_health()
+
+
+@pytest.mark.sanity
+def test_static_port_comes_online(static_port_config):
+    check_health()
+
+
+@pytest.mark.sanity
+def test_can_adjust_config_from_static_to_static_port():
+    check_health()
+
+    config = get_kafka_config()
+    config['env']['BROKER_PORT'] = '9095'
+    update_kafka_config(config)
+
+    check_health()
+
+    result = get_connection_info()
+    assert len(result['address']) == 3
+
+    for hostport in result['address']:
+        assert hostport.split(':')[-1] == '9095'
+
+
+@pytest.mark.sanity
+def test_can_adjust_config_from_static_to_dynamic_port():
+    check_health()
+
+    config = get_kafka_config()
+    config['env']['BROKER_PORT'] = '0'
+    update_kafka_config(config)
+
+    check_health()
+
+    result = get_connection_info()
+    assert len(result['address']) == 3
+
+    for hostport in result['address']:
+        assert 9092 != int(hostport.split(':')[-1])
+
+
+@pytest.mark.sanity
+def test_can_adjust_config_from_dynamic_to_dynamic_port():
+    check_health()
+
+    connections = get_connection_info()['address']
+    config = get_kafka_config()
+    brokerCpus = int(config['env']['BROKER_CPUS'])
+    config['env']['BROKER_CPUS'] = str(brokerCpus + 0.1)
+    update_kafka_config(config)
+
+    check_health()
+
+
+@pytest.mark.sanity
+def test_can_adjust_config_from_dynamic_to_static_port():
+    check_health()
+
+    config = get_kafka_config()
+    config['env']['BROKER_PORT'] = '9092'
+    update_kafka_config(config)
+
+    check_health()
+
+    result = get_connection_info()
+    assert len(result['address']) == 3
+
+    for hostport in result['address']:
+        assert hostport.split(':')[-1] == '9092'
+
+
+# --------- HealtCheck -------------
+
+
+# --------- Recovery -------------
+
+
+# --------- Deployment Strategy  -------------

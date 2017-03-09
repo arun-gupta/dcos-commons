@@ -69,20 +69,3 @@ def pretty_time(seconds):
         ret += '{:.1f}s'.format(seconds)
     return ret
 
-
-def spin(fn, success_predicate, *args, **kwargs):
-    now = time.time()
-    end_time = now + DEFAULT_TIMEOUT
-    while now < end_time:
-        print('{}: [ {} left ]'.format(pretty_time(now), pretty_time(end_time - now)))
-        result = fn(*args, **kwargs)
-        is_successful, error_message = success_predicate(result)
-        if is_successful:
-            print('Success state reached, exiting spin.')
-            break
-        print('Waiting for success state... err={}'.format(error_message))
-        time.sleep(1)
-        now = time.time()
-
-    assert is_successful, error_message
-    return result
