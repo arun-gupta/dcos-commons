@@ -3,6 +3,7 @@
 import collections
 import dcos.errors
 import dcos.marathon
+import sdk_api
 import sdk_spin
 import sdk_tasks
 import shakedown
@@ -34,8 +35,7 @@ def install(package_name, running_task_count, service_name=None, additional_opti
 
     # 3. check service health
     marathon_client = dcos.marathon.create_client()
-
-    def fn():
+    def is_deployment_finished():
         # TODO(nickbp): upstream fix to shakedown, which currently checks for ANY deployments rather
         #               than the one we care about
         deploying_apps = set([])
@@ -47,9 +47,17 @@ def install(package_name, running_task_count, service_name=None, additional_opti
             for app in deployment.get('affectedApps', []):
                 print("Adding {}".format(app))
                 deploying_apps.add(app)
-        print('Checking deployment of {} has ended:\n- Deploying apps: {}'.format(service_name, deploying_apps))
+        print('Checking that deployment of {} has ended:\n- Deploying apps: {}'.format(service_name, deploying_apps))
         return not '/{}'.format(service_name) in deploying_apps
-    sdk_spin.time_wait_noisy(lambda: fn(), timeout_seconds=30)
+    print("Waiting for marathon deployment to finish...")
+    sdk_spin.time_wait_noisy(is_deployment_finished, timeout_seconds=30)
+
+    # 4. Ensure the framework is suppressed.
+    print("Waiting for framework to be suppressed...")
+    sdk_spin.time_wait_noisy(
+        lambda: sdk_api.is_suppressed(service_name),
+        timeout_seconds=30)
+
     print('Install done after {}'.format(sdk_spin.pretty_time(time.time() - start)))
 
 

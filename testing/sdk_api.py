@@ -14,3 +14,8 @@ def get(service_name, endpoint):
         endpoint))
     response.raise_for_status()
     return response
+
+
+def is_suppressed(service_name):
+    response = get(service_name, "/v1/state/properties/suppressed")
+    return response.content == b"true"
